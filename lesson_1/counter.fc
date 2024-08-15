@@ -1,0 +1,86 @@
+#include "imports/stdlib.fc";
+
+const op::increase = 0x7e8764ef;
+
+
+global int ctx_id;
+global int ctx_counter;
+
+
+() load_data() impure {
+    var ds = get_data().begin_parse();
+
+    ctx_id = ds~load_uint(32);
+    ctx_counter = ds~load_uint(32);
+
+    ds.end_parse();
+}
+
+() save_data() impure {
+    set_data(
+        begin_cell()
+            .store_uint(ctx_id, 32)
+            .store_uint(ctx_counter, 32)
+            .end_cell()
+    );
+}
+
+() recv_internal(int my_balance, int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) { ;; ignore all empty messages
+        return ();
+    }
+
+    slice cs = in_msg_full.begin_parse();
+    int flags = cs~load_uint(4);
+    if (flags & 1) { ;; ignore all bounced messages
+        return ();
+    }
+
+    load_data();
+
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+
+    if (op == op::increase) {
+        int increase_by = in_msg_body~load_uint(32);
+        ctx_counter += increase_by;
+        save_data();
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+() recv_external(slice in_msg_body) impure {
+    int op = in_msg_body~load_uint(32);
+    int query_id = in_msg_body~load_uint(64);
+    int current_value = in_msg_body~load_uint(32);
+
+    load_data();
+
+    throw_unless(1001, current_value == ctx_counter); ;; replay protection
+
+    accept_message();
+
+    if (op == op::increase) {
+        int increase_by = in_msg_body~load_uint(32);
+        ctx_counter += increase_by;
+        save_data();
+        return ();
+    }
+
+    throw(0xffff);
+}
+
+
+int get_counter() method_id {
+    load_data();
+    return ctx_counter;
+}
+
+int get_id() method_id {
+    load_data();
+    return ctx_id;
+}
+
+;; 'b5ee9c7241010c0100bd000114ff00f4a413f4bcf2c80b010201200302005af2d31fd33f31d31ff001f84212baf2e3e9f8000182107e8764efba9bd31f30f84201a0f862f002e030840ff2f0020148070402016e0605000db63ffe003f0850000db5473e003f08300202ce090800194f842f841c8cb1fcb1fc9ed5480201200b0a001d3b513434c7c07e1874c7c07e18b46000671b088831c02456f8007434c0cc1c6c244c383c0074c7f4cfcc4060841fa1d93beea6f4c7cc3e1080683e18bc00b80c2103fcbc208d1e30d3'
