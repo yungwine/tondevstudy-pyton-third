@@ -35,7 +35,6 @@ def parse_metadata(cs: Slice):
 
 async def get_jetton(client: LiteBalancer, jetton_address: str):
     result = await client.run_get_method(jetton_address, 'get_jetton_data', [])
-    print(result)
     content = parse_metadata(result[3].begin_parse())
     return {'total_supply': result[0], 'owner': result[2].load_address(), 'content': content}
 
@@ -48,7 +47,6 @@ async def get_wallet_address(client: LiteBalancer, jetton_address: str, user_add
 
 async def get_wallet_data(client: LiteBalancer, wallet_address: str):
     result = await client.run_get_method(wallet_address, 'get_wallet_data', [])
-    print(result)
     return {'balance': result[0], 'owner_address': result[1].load_address(), 'jetton_master_address': result[2].load_address()}
 
 
@@ -62,4 +60,5 @@ async def main():
         print(wallet_data)
 
 
-asyncio.run(main())
+if __name__ == '__main__':
+    asyncio.run(main())
